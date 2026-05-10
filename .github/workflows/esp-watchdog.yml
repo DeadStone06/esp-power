@@ -1,14 +1,18 @@
-name: ESP Freshness Monitor
+name: ESP Watchdog
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
 
 jobs:
   check:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get ThingSpeak data
+      - uses: actions/checkout@v4
+
+      - name: Check ThingSpeak
         run: |
           URL="https://api.thingspeak.com/channels/3369305/feeds.json?results=1"
           RESPONSE=$(curl -s "$URL")
@@ -24,28 +28,15 @@ jobs:
           NOW=$(date -u +%s)
           DIFF=$((NOW - LAST))
 
-          echo "$DIFF" > diff.txt
+          echo $DIFF > diff.txt
 
-      - name: Notify ntfy
+      - name: Send ntfy
         run: |
           DIFF=$(cat diff.txt)
-          NTFY_URL="${{ secrets.NTFY_URL }}"
-          STATE_FILE="esp_state.txt"
-
-          STATE=$(cat $STATE_FILE 2>/dev/null || echo "UNKNOWN")
-
-          echo "DIFF=$DIFF"
+          URL="${{ secrets.NTFY_URL }}"
 
           if [ "$DIFF" -gt 300 ]; then
-            if [ "$STATE" != "DOWN" ]; then
-              echo "DOWN" > $STATE_FILE
-              curl -d "🔴 ESP OFFLINE (>5 min no data)" "$NTFY_URL"
-            fi
+            curl -d "🔴 ESP OFFLINE (>5 min)" "$URL"
           else
-            if [ "$STATE" = "DOWN" ]; then
-              echo "OK" > $STATE_FILE
-              curl -d "🟢 ESP ONLINE restored" "$NTFY_URL"
-            else
-              echo "OK" > $STATE_FILE
-            fi
+            curl -d "🟢 ESP ONLINE" "$URL"
           fi
