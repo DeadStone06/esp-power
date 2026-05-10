@@ -1,30 +1,51 @@
-name: ESP Watchdog (Upptime Triggered)
+name: ESP Freshness Monitor
 
 on:
   workflow_dispatch:
-
-  issues:
-    types: [opened]
 
 jobs:
   check:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Send OFFLINE alert
+      - name: Get ThingSpeak data
         run: |
-          NTFY_URL="${{ secrets.NTFY_URL }}"
-          curl -d "🔴 ESP OFFLINE detected by Upptime" "$NTFY_URL"
+          URL="https://api.thingspeak.com/channels/3369305/feeds.json?results=1"
+          RESPONSE=$(curl -s "$URL")
 
-      - name: Close issue (optional auto-clean)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issue = context.issue;
-            await github.rest.issues.update({
-              ...issue,
-              state: "closed"
-            });
+          TIME=$(echo "$RESPONSE" | jq -r '.feeds[0].created_at')
+
+          if [ -z "$TIME" ] || [ "$TIME" = "null" ]; then
+            echo "NO_DATA"
+            exit 0
+          fi
+
+          LAST=$(date -u -d "${TIME//T/ }" +%s)
+          NOW=$(date -u +%s)
+          DIFF=$((NOW - LAST))
+
+          echo "$DIFF" > diff.txt
+
+      - name: Notify ntfy
+        run: |
+          DIFF=$(cat diff.txt)
+          NTFY_URL="${{ secrets.NTFY_URL }}"
+          STATE_FILE="esp_state.txt"
+
+          STATE=$(cat $STATE_FILE 2>/dev/null || echo "UNKNOWN")
+
+          echo "DIFF=$DIFF"
+
+          if [ "$DIFF" -gt 300 ]; then
+            if [ "$STATE" != "DOWN" ]; then
+              echo "DOWN" > $STATE_FILE
+              curl -d "🔴 ESP OFFLINE (>5 min no data)" "$NTFY_URL"
+            fi
+          else
+            if [ "$STATE" = "DOWN" ]; then
+              echo "OK" > $STATE_FILE
+              curl -d "🟢 ESP ONLINE restored" "$NTFY_URL"
+            else
+              echo "OK" > $STATE_FILE
+            fi
+          fi
