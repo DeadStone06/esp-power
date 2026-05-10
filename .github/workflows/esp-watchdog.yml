@@ -1,79 +1,30 @@
-name: ESP Watchdog
+name: ESP Watchdog (Upptime Triggered)
 
 on:
-  # 🔥 основной триггер по расписанию
-  schedule:
-    - cron: "*/5 * * * *"
-
-  # 🔥 ручной запуск для теста
   workflow_dispatch:
+
+  issues:
+    types: [opened]
 
 jobs:
   check:
     runs-on: ubuntu-latest
 
     steps:
-      # обязательно: подключаем репозиторий
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # проверка времени последней записи ThingSpeak
-      - name: Fetch ThingSpeak data
+      - name: Send OFFLINE alert
         run: |
-          echo "🔄 Fetching data..."
-
-          URL="https://api.thingspeak.com/channels/3369305/feeds.json?results=1"
-          RESPONSE=$(curl -s "$URL")
-
-          TIME=$(echo "$RESPONSE" | jq -r '.feeds[0].created_at')
-
-          if [ -z "$TIME" ] || [ "$TIME" = "null" ]; then
-            echo "NO_DATA"
-            exit 0
-          fi
-
-          LAST=$(date -u -d "${TIME//T/ }" +%s)
-          NOW=$(date -u +%s)
-          DIFF=$((NOW - LAST))
-
-          echo "DIFF=$DIFF"
-          echo "$DIFF" > diff.txt
-
-      # логика OFFLINE / ONLINE + антиспам
-      - name: Check ESP state
-        run: |
-          DIFF=$(cat diff.txt)
-          STATE_FILE="esp_state.txt"
           NTFY_URL="${{ secrets.NTFY_URL }}"
+          curl -d "🔴 ESP OFFLINE detected by Upptime" "$NTFY_URL"
 
-          STATE=$(cat $STATE_FILE 2>/dev/null || echo "UNKNOWN")
-
-          echo "Current diff: $DIFF"
-          echo "Current state: $STATE"
-
-          # 🔴 OFFLINE если > 5 минут
-          if [ "$DIFF" -gt 300 ]; then
-            if [ "$STATE" != "DOWN" ]; then
-              echo "DOWN" > $STATE_FILE
-              curl -d "🔴 ESP OFFLINE (no data >5 min)" "$NTFY_URL"
-            fi
-
-          # 🟢 ONLINE
-          else
-            if [ "$STATE" = "DOWN" ]; then
-              echo "OK" > $STATE_FILE
-              curl -d "🟢 ESP ONLINE restored" "$NTFY_URL"
-            else
-              echo "OK" > $STATE_FILE
-            fi
-          fi
-
-      # сохраняем состояние между запусками
-      - name: Save state
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-
-          git add esp_state.txt || true
-          git commit -m "update esp state" || exit 0
-          git push || true
+      - name: Close issue (optional auto-clean)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.issue;
+            await github.rest.issues.update({
+              ...issue,
+              state: "closed"
+            });
