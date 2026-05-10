@@ -1,71 +1,10 @@
-name: ESP Watchdog
+name: ESP Watchdog Test
 
 on:
-  schedule:
-    - cron: "*/2 * * * *"
   workflow_dispatch:
 
 jobs:
-  check:
+  test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Get latest ThingSpeak data
-        run: |
-          URL="https://api.thingspeak.com/channels/3369305/feeds.json?results=1"
-          RESPONSE=$(curl -s "$URL")
-
-          echo "$RESPONSE" > response.json
-
-          TIME=$(echo "$RESPONSE" | jq -r '.feeds[0].created_at')
-
-          if [ -z "$TIME" ] || [ "$TIME" = "null" ]; then
-            echo "NO_DATA"
-            exit 0
-          fi
-
-          LAST=$(date -u -d "$TIME" +%s)
-          NOW=$(date -u +%s)
-
-          DIFF=$((NOW - LAST))
-
-          echo "$DIFF" > diff.txt
-
-      - name: Evaluate status + send ntfy
-        run: |
-          DIFF=$(cat diff.txt)
-          STATE_FILE="esp_state.txt"
-          NTFY_URL="${{ secrets.NTFY_URL }}"
-
-          STATE=$(cat $STATE_FILE 2>/dev/null || echo "UNKNOWN")
-
-          echo "DIFF=$DIFF"
-          echo "STATE=$STATE"
-
-          # ===== THRESHOLD (5 minutes) =====
-          if [ "$DIFF" -gt 300 ]; then
-
-            if [ "$STATE" != "DOWN" ]; then
-              echo "DOWN" > $STATE_FILE
-              curl -d "🔴 ESP OFFLINE (no updates >5 min)" "$NTFY_URL"
-            fi
-
-          else
-
-            if [ "$STATE" = "DOWN" ]; then
-              echo "OK" > $STATE_FILE
-              curl -d "🟢 ESP ONLINE restored" "$NTFY_URL"
-            else
-              echo "OK" > $STATE_FILE
-            fi
-
-          fi
-
-      - name: Save state
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-
-          git add esp_state.txt || true
-          git commit -m "update esp state" || exit 0
-          git push || true
+      - run: echo "WORKFLOW OK"
