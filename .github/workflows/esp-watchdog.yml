@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Check ESP status
+      - name: Run watchdog
         env:
           NTFY_URL: ${{ secrets.NTFY_URL }}
         run: |
@@ -24,42 +24,61 @@ jobs:
 
           echo "Fetching ThingSpeak..."
 
-          # ---- RETRY LOGIC ----
           DATA=""
+
+          # -------------------------
+          # RETRY LOGIC (3 попытки)
+          # -------------------------
           for i in 1 2 3; do
-            DATA=$(curl --silent --show-error --max-time 15 "$URL")
+            DATA=$(curl -s --max-time 15 -H "Accept: application/json" "$URL")
             
-            if echo "$DATA" | jq . >/dev/null 2>&1; then
+            echo "Attempt $i response length: ${#DATA}"
+
+            echo "$DATA" | jq . >/dev/null 2>&1
+            if [ $? -eq 0 ]; then
               echo "Valid JSON received"
               break
             fi
 
-            echo "Attempt $i failed, retrying..."
+            echo "Invalid response, retry..."
             sleep 2
           done
 
-          # ---- FINAL CHECK ----
-          if ! echo "$DATA" | jq . >/dev/null 2>&1; then
-            echo "ERROR: Invalid or empty response from ThingSpeak"
+          # -------------------------
+          # SAFETY CHECK (НЕ ПАДАЕМ)
+          # -------------------------
+          echo "$DATA" | jq . >/dev/null 2>&1
+          if [ $? -ne 0 ]; then
+            echo "WARNING: ThingSpeak returned invalid data, skipping run"
             exit 0
           fi
 
-          # ---- PARSE ----
-          LAST=$(echo "$DATA" | jq -r '.feeds[0].created_at')
+          # -------------------------
+          # PARSE DATA SAFELY
+          # -------------------------
+          LAST=$(echo "$DATA" | jq -r '.feeds[0].created_at // empty')
 
-          if [ "$LAST" = "null" ] || [ -z "$LAST" ]; then
-            echo "No valid timestamp"
+          if [ -z "$LAST" ]; then
+            echo "No timestamp found, skipping"
             exit 0
           fi
 
-          LAST_TS=$(date -d "$LAST" +%s)
+          LAST_TS=$(date -d "$LAST" +%s 2>/dev/null || echo 0)
           NOW_TS=$(date +%s)
+
+          if [ "$LAST_TS" -eq 0 ]; then
+            echo "Bad timestamp parsing"
+            exit 0
+          fi
 
           DIFF=$((NOW_TS - LAST_TS))
 
           echo "Last update: $LAST"
-          echo "Diff: $DIFF sec"
+          echo "Diff seconds: $DIFF"
 
+          # -------------------------
+          # STATE FILE
+          # -------------------------
           STATE_FILE=".esp_state"
 
           if [ ! -f "$STATE_FILE" ]; then
@@ -74,19 +93,21 @@ jobs:
             CURR="online"
           fi
 
-          echo "Prev: $PREV"
-          echo "Curr: $CURR"
+          echo "Prev state: $PREV"
+          echo "Curr state: $CURR"
 
-          # ---- NOTIFY ONLY ON CHANGE ----
+          # -------------------------
+          # NOTIFY ONLY ON CHANGE
+          # -------------------------
           if [ "$PREV" != "$CURR" ]; then
 
             if [ "$CURR" = "offline" ]; then
-              curl --silent --max-time 10 \
+              curl -s --max-time 10 \
                 -H "Title: ESP Alert" \
                 -d "🔴 ESP OFFLINE" \
                 "$NTFY_URL"
             else
-              curl --silent --max-time 10 \
+              curl -s --max-time 10 \
                 -H "Title: ESP Alert" \
                 -d "🟢 ESP ONLINE" \
                 "$NTFY_URL"
