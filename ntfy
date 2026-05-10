@@ -1,0 +1,22 @@
+name: ntfy alerts
+
+on:
+  issues:
+    types: [opened, closed]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send ntfy notification
+        run: |
+          EVENT="${{ github.event.action }}"
+          TITLE="${{ github.event.issue.title }}"
+
+          if [ "$EVENT" = "opened" ]; then
+            MSG="🔴 ESP DOWN: $TITLE"
+          else
+            MSG="🟢 ESP RECOVERED: $TITLE"
+          fi
+
+          curl -d "$MSG" ${{ secrets.NTFY_URL }}
