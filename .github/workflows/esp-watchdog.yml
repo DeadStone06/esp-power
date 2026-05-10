@@ -2,8 +2,6 @@ name: ESP Watchdog
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "*/5 * * * *"
 
 jobs:
   check:
@@ -36,7 +34,7 @@ jobs:
           URL="${{ secrets.NTFY_URL }}"
 
           if [ "$DIFF" -gt 300 ]; then
-            curl -d "🔴 ESP OFFLINE (>5 min)" "$URL"
+            curl -d "🔴 ESP OFFLINE" "$URL"
           else
             curl -d "🟢 ESP ONLINE" "$URL"
           fi
