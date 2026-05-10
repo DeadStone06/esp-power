@@ -1,7 +1,9 @@
+owner: DeadStone06
+repo: esp-power
+
 sites:
   - name: ESP ThingSpeak
     url: https://api.thingspeak.com/channels/3369305/feeds.json?results=1
-    method: GET
     expectedStatusCodes:
       - 200
     maxResponseTime: 5000
