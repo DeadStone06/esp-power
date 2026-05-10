@@ -1,17 +1,13 @@
-owner: DeadStone06
-repo: esp-power
-
 sites:
   - name: ESP ThingSpeak
     url: https://api.thingspeak.com/channels/3369305/feeds.json?results=1
+    method: GET
+    expectedStatusCodes:
+      - 200
+    maxResponseTime: 5000
 
 status-website:
   baseUrl: /esp-power
-  name: ESP Power Monitor
-  introTitle: "ESP-01 monitoring system"
-  introMessage: "Status page for ESP device via ThingSpeak"
-  navbar:
-    - title: Status
-      href: /
-    - title: GitHub
-      href: https://github.com/DeadStone06/esp-power
+
+notifications:
+  - type: issues
