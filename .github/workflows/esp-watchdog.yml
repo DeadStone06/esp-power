@@ -1,0 +1,26 @@
+name: ESP watchdog
+
+on:
+  schedule:
+    - cron: "*/1 * * * *"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check ThingSpeak
+        run: |
+          RESPONSE=$(curl -s "https://api.thingspeak.com/channels/3369305/feeds.json?results=1")
+
+          LAST=$(echo "$RESPONSE" | jq -r '.feeds[0].created_at')
+
+          NOW=$(date -u +%s)
+          LAST_TS=$(date -d "$LAST" +%s)
+
+          DIFF=$((NOW - LAST_TS))
+
+          echo "Diff: $DIFF sec"
+
+          if [ $DIFF -gt 120 ]; then
+            curl -d "🔴 ESP DOWN (no data ${DIFF}s)" ${{ secrets.NTFY_URL }}
+          fi
