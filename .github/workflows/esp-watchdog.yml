@@ -28,17 +28,17 @@ jobs:
 
           echo "Response received"
 
-          # проверка JSON
+          # ---- validate JSON ----
           echo "$DATA" | jq . >/dev/null 2>&1
           if [ $? -ne 0 ]; then
-            echo "Invalid response from ThingSpeak"
+            echo "Invalid ThingSpeak response"
             exit 0
           fi
 
           LAST=$(echo "$DATA" | jq -r '.feeds[0].created_at // empty')
 
           if [ -z "$LAST" ]; then
-            echo "No timestamp"
+            echo "No timestamp found"
             exit 0
           fi
 
@@ -55,6 +55,7 @@ jobs:
           echo "Last update: $LAST"
           echo "Diff seconds: $DIFF"
 
+          # ---- STATE ----
           STATE_FILE=".esp_state"
 
           if [ ! -f "$STATE_FILE" ]; then
@@ -72,10 +73,11 @@ jobs:
           echo "Prev state: $PREV"
           echo "Curr state: $CURR"
 
-          # уведомления только при изменении
+          # ---- NOTIFY ON CHANGE ----
           if [ "$CURR" != "$PREV" ]; then
 
             if [ "$CURR" = "offline" ]; then
+              echo "Sending OFFLINE alert"
               curl -s --max-time 10 \
                 -H "Title: ESP Alert" \
                 -d "🔴 ESP OFFLINE" \
@@ -83,6 +85,7 @@ jobs:
             fi
 
             if [ "$CURR" = "online" ]; then
+              echo "Sending ONLINE alert"
               curl -s --max-time 10 \
                 -H "Title: ESP Alert" \
                 -d "🟢 ESP ONLINE" \
@@ -90,9 +93,10 @@ jobs:
             fi
 
           else
-            echo "No state change"
+            echo "No state change → no notification"
           fi
 
+          # ---- SAVE STATE ALWAYS ----
           echo "$CURR" > "$STATE_FILE"
 
           git config user.name "github-actions"
