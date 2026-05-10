@@ -1,47 +1,103 @@
-STATE_FILE=".esp_state"
+name: ESP Watchdog
 
-# если файла нет — считаем что система была online
-if [ ! -f "$STATE_FILE" ]; then
-  echo "online" > "$STATE_FILE"
-fi
+on:
+  workflow_dispatch:
 
-PREV=$(cat "$STATE_FILE")
+permissions:
+  contents: write
 
-# определяем текущее состояние
-if [ "$DIFF" -gt 300 ]; then
-  CURR="offline"
-else
-  CURR="online"
-fi
+jobs:
+  check:
+    runs-on: ubuntu-latest
 
-echo "Prev state: $PREV"
-echo "Curr state: $CURR"
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-# -------------------------
-# УВЕДОМЛЕНИЯ ТОЛЬКО ПРИ ИЗМЕНЕНИИ
-# -------------------------
+      - name: Run watchdog
+        env:
+          NTFY_URL: ${{ secrets.NTFY_URL }}
+        run: |
+          set +e
 
-if [ "$CURR" != "$PREV" ]; then
+          URL="https://api.thingspeak.com/channels/3369305/feeds.json?results=1"
 
-  if [ "$CURR" = "offline" ]; then
-    curl -s --max-time 10 \
-      -H "Title: ESP Alert" \
-      -d "🔴 ESP OFFLINE" \
-      "$NTFY_URL"
-  fi
+          echo "Fetching ThingSpeak..."
 
-  if [ "$CURR" = "online" ]; then
-    curl -s --max-time 10 \
-      -H "Title: ESP Alert" \
-      -d "🟢 ESP ONLINE" \
-      "$NTFY_URL"
-  fi
+          DATA=$(curl -s --max-time 15 -H "Accept: application/json" "$URL")
 
-else
-  echo "No state change → no notification"
-fi
+          echo "Response received"
 
-# -------------------------
-# ВСЕГДА ОБНОВЛЯЕМ STATE
-# -------------------------
-echo "$CURR" > "$STATE_FILE"
+          # проверка JSON
+          echo "$DATA" | jq . >/dev/null 2>&1
+          if [ $? -ne 0 ]; then
+            echo "Invalid response from ThingSpeak"
+            exit 0
+          fi
+
+          LAST=$(echo "$DATA" | jq -r '.feeds[0].created_at // empty')
+
+          if [ -z "$LAST" ]; then
+            echo "No timestamp"
+            exit 0
+          fi
+
+          LAST_TS=$(date -d "$LAST" +%s 2>/dev/null || echo 0)
+          NOW_TS=$(date +%s)
+
+          if [ "$LAST_TS" -eq 0 ]; then
+            echo "Bad timestamp"
+            exit 0
+          fi
+
+          DIFF=$((NOW_TS - LAST_TS))
+
+          echo "Last update: $LAST"
+          echo "Diff seconds: $DIFF"
+
+          STATE_FILE=".esp_state"
+
+          if [ ! -f "$STATE_FILE" ]; then
+            echo "online" > "$STATE_FILE"
+          fi
+
+          PREV=$(cat "$STATE_FILE")
+
+          if [ "$DIFF" -gt 300 ]; then
+            CURR="offline"
+          else
+            CURR="online"
+          fi
+
+          echo "Prev state: $PREV"
+          echo "Curr state: $CURR"
+
+          # уведомления только при изменении
+          if [ "$CURR" != "$PREV" ]; then
+
+            if [ "$CURR" = "offline" ]; then
+              curl -s --max-time 10 \
+                -H "Title: ESP Alert" \
+                -d "🔴 ESP OFFLINE" \
+                "$NTFY_URL"
+            fi
+
+            if [ "$CURR" = "online" ]; then
+              curl -s --max-time 10 \
+                -H "Title: ESP Alert" \
+                -d "🟢 ESP ONLINE" \
+                "$NTFY_URL"
+            fi
+
+          else
+            echo "No state change"
+          fi
+
+          echo "$CURR" > "$STATE_FILE"
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add "$STATE_FILE"
+          git commit -m "ESP state: $CURR" || true
+          git push || true
