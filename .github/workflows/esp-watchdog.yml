@@ -80,7 +80,7 @@ jobs:
               echo "Sending OFFLINE alert"
               curl -s --max-time 10 \
                 -H "Title: ESP Alert" \
-                -d "-d "⚡ Дома пропало электричество" \
+                -d "⚡ Дома пропало электричество" \
                 "$NTFY_URL"
             fi
 
@@ -88,7 +88,7 @@ jobs:
               echo "Sending ONLINE alert"
               curl -s --max-time 10 \
                 -H "Title: ESP Alert" \
-                -d "-d "✅ Электричество снова появилось" \
+                -d "✅ Электричество снова появилось" \
                 "$NTFY_URL"
             fi
 
