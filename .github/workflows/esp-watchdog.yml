@@ -64,7 +64,7 @@ jobs:
 
           PREV=$(cat "$STATE_FILE")
 
-          if [ "$DIFF" -gt 120 ]; then
+          if [ "$DIFF" -gt 180 ]; then
             CURR="offline"
           else
             CURR="online"
