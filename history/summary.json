@@ -4,7 +4,7 @@
     "url": "https://api.thingspeak.com/channels/3369305/feeds.json?results=1",
     "icon": "https://icons.duckduckgo.com/ip3/api.thingspeak.com.ico",
     "slug": "esp-thing-speak",
-    "status": "up",
+    "status": "down",
     "uptime": "100.00%",
     "uptimeDay": "100.00%",
     "uptimeWeek": "100.00%",
