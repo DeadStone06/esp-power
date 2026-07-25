@@ -4,17 +4,19 @@
     "url": "https://api.thingspeak.com/channels/3369305/feeds.json?results=1",
     "icon": "https://icons.duckduckgo.com/ip3/api.thingspeak.com.ico",
     "slug": "esp-thing-speak",
-    "status": "down",
-    "uptime": "100.00%",
-    "uptimeDay": "100.00%",
-    "uptimeWeek": "100.00%",
-    "uptimeMonth": "100.00%",
-    "uptimeYear": "100.00%",
-    "time": 170,
-    "timeDay": 120,
-    "timeWeek": 170,
-    "timeMonth": 168,
-    "timeYear": 170,
-    "dailyMinutesDown": {}
+    "status": "up",
+    "uptime": "99.93%",
+    "uptimeDay": "94.95%",
+    "uptimeWeek": "99.28%",
+    "uptimeMonth": "99.83%",
+    "uptimeYear": "99.93%",
+    "time": 171,
+    "timeDay": 186,
+    "timeWeek": 180,
+    "timeMonth": 170,
+    "timeYear": 171,
+    "dailyMinutesDown": {
+      "2026-07-25": 73
+    }
   }
 ]
